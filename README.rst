@@ -9,7 +9,7 @@ glsr.sh
 
    glsr.sh, v0.1.0, default setting. (click image for album or watch screencast_)
 
-.. _screencast: https://www.youtube.com/watch?v=6_YDc8xZZ2g
+.. _screencast: https://www.youtube.com/watch?v=uofkUcIIoS0
 
 ``glsr.sh`` is a script that draws top-down routes which could split or hit
 dead ends.
