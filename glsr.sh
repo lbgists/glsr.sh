@@ -21,7 +21,7 @@
 # SOFTWARE.
 
 
-VERSION=0.1.0
+VERSION=0.2.0
 
 R_INTN=1
 # maximum routes, default is ~10% of terminal width
