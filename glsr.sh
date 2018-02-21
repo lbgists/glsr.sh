@@ -38,6 +38,7 @@ P_DEADEND=5
 COLOR=1
 DELAY=0.05
 MAX_STEPS=0
+SHOW_MARKS=1
 HELP="Usage: $(basename $0) [OPTIONS]
 Go Left, Straight, or Right?
 
@@ -56,6 +57,7 @@ Options:
     -Z [0-100]      probability of hitting dead end (Default: $P_DEADEND)
 
     -C              no colors
+    -M              no marks
 
     -h              this help message
     -v              print version number
@@ -63,7 +65,7 @@ Options:
 
 parse()
 {
-    while getopts "n:m:t:s:T:S:3:N:Z:Chv" arg; do
+    while getopts "n:m:t:s:T:S:3:N:Z:CMhv" arg; do
         case $arg in
             n)
                 if ((OPTARG <= 0)); then
@@ -123,6 +125,9 @@ parse()
             C)
                 COLOR=0
                 ;;
+            M)
+                SHOW_MARKS=0
+                ;;
             h)
                 echo -e "$HELP"
                 exit 0
@@ -152,12 +157,35 @@ check()
 }
 
 
+reset_marks()
+{
+    # MN: count
+    # MS: mark symbol
+    # MP: mark position
+    # MC: mark color
+    MN=0
+    declare -ga MS=() MP=() MC=()
+}
+
+
+new_mark()
+{
+    MS+=("$1")
+    MP+=("$2")
+    ((COLOR)) && MC+=("$3")
+    ((MN++))
+}
+
+
 new_r()
 {
     ((COLOR)) && RC+=($((31 + RANDOM * 6 / 32768)))
     RD+=($((RANDOM * 3 / 32768)))
     RP+=($((RANDOM * COLS / 32768)))
     RN="${#RD[@]}"
+
+    ((SHOW_MARKS)) || return
+    new_mark o ${RP[RN - 1]} $((COLOR ? RC[RN - 1] : 0))
 }
 
 
@@ -189,13 +217,15 @@ init()
     for ((i = 0; i < $R_INTN; i++)); do
         new_r
     done
+
+    ((SHOW_MARKS)) && reset_marks
 }
 
 
-draw()
+form_walk()
 {
-    local i c d s p line
-    declare -a L=()
+    local i c d s p
+    declare -ga L=()
 
     for ((i = 0; i < RN; i++)); do
         ((COLOR)) && c="${RC[i]}"
@@ -204,6 +234,28 @@ draw()
         p="${RP[i]}"
         ((COLOR)) && L[p]="\\e[1;${c}m$s\\e[0m" || L[p]="$s"
     done
+}
+
+
+form_update()
+{
+    ((SHOW_MARKS)) || return
+
+    local i s p
+
+    # place marks
+    for ((i = 0; i < MN; i++)); do
+        s="${MS[d]}"
+        p="${MP[i]}"
+        ((COLOR)) && L[p]="\\e[1;${MC[i]}m$s\\e[0m" || L[p]="$s"
+    done
+    reset_marks
+}
+
+
+draw()
+{
+    local i line
 
     # fill up blanks
     for ((i = 0; i < COLS; i++)); do
@@ -242,6 +294,7 @@ update()
     # dead ends
     if ((RN > 0 && RANDOM * 100 / 32768 < P_DEADEND)); then
         ((i = RANDOM * RN / 32768))
+        new_mark x ${RP[i]} $((COLOR ? RC[i] : 0))
         ((COLOR)) && unset RC[i]
         unset RD[i]
         unset RP[i]
@@ -265,6 +318,7 @@ update()
     # if splitting, only splitting one route
     if ((RN < MAX_R && RANDOM * 100 / 32768 < P_SPLIT)); then
         ((i = RANDOM * RN / 32768))
+        new_mark '*' ${RP[i]} $((COLOR ? RC[i] : 0))
         d="${RD[i]}"
         p="${RP[i]}"
         # do 3 split if MAX_R allows and at odds
@@ -293,11 +347,13 @@ roll()
     stty -echo
     while REPLY=; read -t $DELAY -n 1; [[ -z "$REPLY" ]] ; do
         walk
-        draw
+        form_walk
         if ((MAX_STEPS > 0 && STEPS >= MAX_STEPS)); then
             break
         fi
         update
+        form_update
+        draw
     done
     stty echo
 
